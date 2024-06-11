@@ -6,6 +6,7 @@ import base64
 import final_top as scirpt_1
 import final_spiral as script_2
 import knn_ordering as script_3
+import main as script_4
 app = Flask(__name__)
 
 UPLOAD_FOLDER = 'uploads'
@@ -34,7 +35,8 @@ def upload_file():
         output_data, images = script_2.main(file_path)
     elif option == '3':
         output_data, images = script_3.main(file_path)
-
+    elif option == '4':
+        output_data, images = script_4.main(file_path)
     else:
         return jsonify({'error': 'Invalid option'})
 
