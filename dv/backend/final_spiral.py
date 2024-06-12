@@ -7,6 +7,8 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import euclidean_distances
 import os
+import io
+from PIL import Image
 
 def compute_cluster_radius(cluster_center, cluster_points):
     distances = euclidean_distances(cluster_points, cluster_center.reshape(1, -1))
@@ -103,6 +105,14 @@ def cluster_spiral_ordering(X, cluster_labels):
 def sort_subspaces_by_cluster_quality(subspace_quality):
     return sorted(subspace_quality.items(), key=lambda x: x[1], reverse=True)
 
+def save_and_encode_image(fig):
+    """Save the given figure to a bytes buffer and encode it as an image."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight')
+    buf.seek(0)
+    image_data = buf.getvalue()
+    return image_data
+
 def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=10):
     n = H.shape[0]
 
@@ -118,7 +128,6 @@ def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=
 
     final_order = cluster_spiral_ordering(X, cluster_labels)
 
-
     for i, subspace in enumerate(top_subspaces):
         subspace_idx = P.index(subspace)
         H_subspace_reordered = H[:, :, subspace_idx][sorted_indices[final_order]][:, sorted_indices[final_order]]
@@ -127,7 +136,7 @@ def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=
 
     combined_matrix = np.clip(combined_matrix, 0, 1)  # Ensure values are between 0 and 1
 
-    plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(15, 10))  # Set the figure size larger for high resolution
     plt.imshow(combined_matrix, aspect='auto')
     plt.title(f'Top {top_n} Subspaces Visualization (kNN Ordering within Clusters)')
     plt.xlabel('Columns')
@@ -137,25 +146,26 @@ def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=
     patches = [plt.plot([], [], marker="s", ms=10, ls="", mec=None, color=colors[i % len(colors)], 
                 label="" + str(top_subspaces[i]))[0] for i in range(top_n)]
     plt.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
-    plt.show()
+
+    image_data = save_and_encode_image(fig)
+    plt.close(fig)  # Close the figure after saving
+
+    return image_data  # Return the image data
 
 # Example usage
 def main(filepath):
     # Load and preprocess your data
-    
-    # data = pd.read_csv(filepath).iloc[:, 1:-1]
     _, file_extension = os.path.splitext(filepath)
         
-        # Check if the file is iris.csv
+    # Check if the file is iris.csv
     if os.path.basename(filepath) == 'Iris.csv':
-            data = pd.read_csv(filepath).iloc[:, 1:-1]
+        data = pd.read_csv(filepath).iloc[:, 1:-1]
     elif file_extension.lower() == '.csv':
-            data = pd.read_csv(filepath).iloc[:, :-1]
+        data = pd.read_csv(filepath).iloc[:, :-1]
     elif file_extension.lower() in ('.xls', '.xlsx'):
-            data = pd.read_excel(filepath).iloc[:, :-1]
+        data = pd.read_excel(filepath).iloc[:, :-1]
     else:
-            raise ValueError("Unsupported file format")
-
+        raise ValueError("Unsupported file format")
 
     label_encoders = {}
     for column in data.select_dtypes(include=['object']):
@@ -175,7 +185,9 @@ def main(filepath):
     H, P, subspace_quality = heidi_matrix(scaled_data, D, k)
 
     # Visualize the top 10 subspaces (you can change the number of top subspaces by modifying the top_n parameter)
-    visualize_top_subspaces(H, P, subspace_quality, cluster_labels, scaled_data, k, top_n=5)
+    image_data = visualize_top_subspaces(H, P, subspace_quality, cluster_labels, scaled_data, k, top_n=5)
+
+    return {"data": cluster_labels.tolist()}, {"visualization": image_data}
 
 if __name__ == "__main__":
     main()

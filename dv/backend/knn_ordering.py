@@ -7,6 +7,8 @@ from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import os
+import io
+from PIL import Image
 
 def powerset(s):
     return list(chain.from_iterable(combinations(s, r) for r in range(1, len(s) + 1)))
@@ -63,6 +65,14 @@ def knn_ordering(knn_indices):
 
     return order
 
+def save_and_encode_image(fig):
+    """Save the given figure to a bytes buffer and encode it as an image."""
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight')
+    buf.seek(0)
+    image_data = buf.getvalue()
+    return image_data
+
 
 def visualize_heidi_matrix_single(H, cluster_labels, X, dim, k):
     sorted_indices = np.argsort(cluster_labels)
@@ -86,13 +96,14 @@ def visualize_heidi_matrix_single(H, cluster_labels, X, dim, k):
     # Create a custom colormap that starts with white
     cmap = mcolors.LinearSegmentedColormap.from_list('white_to_viridis', ['white', 'blue', 'green', 'yellow', 'red'])
 
-    plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(10, 8))
     plt.imshow(H_reordered, cmap=cmap, aspect='auto', vmin=0, vmax=1)
     plt.colorbar(label='Presence in k-NN')
     plt.title(f'Heidi Matrix Visualization for Dimension {dim} (kNN Ordering)')
     plt.xlabel('Columns')
     plt.ylabel('Rows')
-    plt.show()
+    image_data = save_and_encode_image(fig)
+    return image_data
 
 def visualize_combined_heidi_matrix(H_list, cluster_labels, X, k):
     # Combine the individual Heidi matrices
@@ -124,13 +135,14 @@ def visualize_combined_heidi_matrix(H_list, cluster_labels, X, k):
     # Define a custom colormap with shades of blue
     cmap = mcolors.LinearSegmentedColormap.from_list('shades_of_blue', [(0, 'white'), (0.5, 'blue'), (1, 'navy')])
 
-    plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(10, 8))
     plt.imshow(H_norm, cmap=cmap, aspect='auto', vmin=0, vmax=1)
     plt.colorbar(label='Normalized Bit Vector Value')
     plt.title('Combined Heidi Matrix Visualization (kNN Ordering within Clusters)')
     plt.xlabel('Columns')
     plt.ylabel('Rows')
-    plt.show()
+    image_data = save_and_encode_image(fig)
+    return image_data
 
 def visualize_heidi_matrix(H, cluster_labels, X, k):
     sorted_indices = np.argsort(cluster_labels)
@@ -161,7 +173,7 @@ def visualize_heidi_matrix(H, cluster_labels, X, k):
     # Define a custom colormap with shades of blue
     cmap = mcolors.LinearSegmentedColormap.from_list('shades_of_blue', [(0, 'white'), (0.5, 'blue'), (1, 'navy')])
 
-    plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(10, 8))
     
     # Overlay the colors with alpha values
     plt.imshow(H_norm, cmap=cmap, aspect='auto', vmin=0, vmax=1)
@@ -173,7 +185,10 @@ def visualize_heidi_matrix(H, cluster_labels, X, k):
     plt.title('Heidi Matrix Visualization (kNN Ordering within Clusters)')
     plt.xlabel('Columns')
     plt.ylabel('Rows')
-    plt.show()
+    # plt.show()
+    image_data = save_and_encode_image(fig)
+    return image_data
+
 
 
 
@@ -204,7 +219,7 @@ def main(filepath):
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(data)
 
-    kmeans = KMeans()
+    kmeans = KMeans(n_clusters=3)
     kmeans.fit(scaled_data)
     cluster_labels = kmeans.labels_
 
@@ -217,12 +232,15 @@ def main(filepath):
     # visualize_heidi_matrix(H, cluster_labels, scaled_data, k)
 
     H_list = []
-
+    image_data_list = []
     # Visualize each single-dimensional Heidi matrix and store in the list
     for dim in D:
         H_single = heidi_matrix_single_dimension(scaled_data, dim, k)
         H_list.append(H_single)
-        visualize_heidi_matrix_single(H_single, cluster_labels, scaled_data, dim, k)
+        image_data=visualize_heidi_matrix_single(H_single, cluster_labels, scaled_data, dim, k)
+        image_data_list.append(image_data)
+
+        return {"data": cluster_labels.tolist()}, {"visualization_single": image_data_list}
 
     # Visualize the combined Heidi matrix
     # visualize_combined_heidi_matrix(H_list, cluster_labels, scaled_data, k)

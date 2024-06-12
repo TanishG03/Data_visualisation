@@ -1,17 +1,20 @@
 from flask import Flask, request, jsonify
 import os
-import pandas as pd
-from final_top import main  # Import the main function from your Python script
 import base64
-import final_top as scirpt_1
+from final_top import main  # Import the main function from your Python script
+import final_top as script_1
 import final_spiral as script_2
 import knn_ordering as script_3
 import main as script_4
+from flask_cors import CORS
+
 app = Flask(__name__)
+CORS(app)  # Enable CORS
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+
 @app.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
@@ -30,7 +33,7 @@ def upload_file():
 
     # Conditionally run different scripts based on the selected option
     if option == '1':
-        output_data, images = scirpt_1.main(file_path)
+        output_data, images = script_1.main(file_path)
     elif option == '2':
         output_data, images = script_2.main(file_path)
     elif option == '3':

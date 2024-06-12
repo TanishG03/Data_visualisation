@@ -48,18 +48,18 @@ const UploadCSV = () => {
       <button onClick={handleUpload}>Upload</button>
 
       {/* Render the output data */}
-      {outputData && (
+      {/* {outputData && (
         <div>
           <h2>Processed Data</h2>
           <pre>{JSON.stringify(outputData, null, 2)}</pre>
         </div>
-      )}
+      )} */}
 
       {/* Render the output images */}
       {outputImages && Object.keys(outputImages).map((imageName) => (
         <div key={imageName}>
           <h2>{imageName}</h2>
-          <img src={`data:image/jpeg;base64,${outputImages[imageName]}`} alt={imageName} />
+          <img src={`data:image/png;base64,${outputImages[imageName]}`} alt={imageName} />
         </div>
       ))}
     </div>
