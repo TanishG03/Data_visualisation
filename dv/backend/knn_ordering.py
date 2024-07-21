@@ -239,8 +239,10 @@ def main(filepath):
         H_list.append(H_single)
         image_data=visualize_heidi_matrix_single(H_single, cluster_labels, scaled_data, dim, k)
         image_data_list.append(image_data)
+        # print(len(image_data_list))
 
-        return {"data": cluster_labels.tolist()}, {"visualization_single": image_data_list}
+    # print(len(image_data_list))
+    return {"data": cluster_labels.tolist()}, image_data_list
 
     # Visualize the combined Heidi matrix
     # visualize_combined_heidi_matrix(H_list, cluster_labels, scaled_data, k)

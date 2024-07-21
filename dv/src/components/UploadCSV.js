@@ -43,7 +43,10 @@ const UploadCSV = () => {
         <option value="1">Top KNN</option>
         <option value="2">Top Spiral</option>
         <option value="3">Single Dim KNN</option>
-        <option value="4">Bead</option>
+        <option value="4">limit</option>
+        <option value="5">new</option>
+        <option value="6">Individual</option>
+        <option value="7">Other</option>
       </select>
       <button onClick={handleUpload}>Upload</button>
 

@@ -10,10 +10,14 @@ import io
 import os
 
 def compute_cluster_radius(cluster_center, cluster_points):
+    if cluster_points.shape[0] == 0:
+        return 0
     distances = euclidean_distances(cluster_points, cluster_center.reshape(1, -1))
     return np.max(distances)
 
 def compute_cluster_diameter(cluster_points):
+    if cluster_points.shape[0] == 0:
+        return 0
     distances = euclidean_distances(cluster_points)
     return np.max(distances)
 
@@ -33,19 +37,15 @@ def compute_knn(X, k, subspace_indices):
     distances, indices = nbrs.kneighbors(X[:, subspace_indices])
     return indices
 
-def heidi_matrix(X, D, k):
-    n = X.shape[0]
+def calculate_subspace_quality(X, D, k):
     P = powerset(D)
-    subspace_map = {subspace: idx for idx, subspace in enumerate(P)}
-    H = np.zeros((n, n, len(P)), dtype=int)
     subspace_quality = {subspace: 0 for subspace in P}
 
     for subspace in P:
         subspace_indices = list(subspace)
-        knn_indices = compute_knn(X, k, subspace_indices)
 
         # Compute cluster quality in the current subspace
-        kmeans = KMeans()
+        kmeans = KMeans(n_clusters=5, random_state=2)
         kmeans.fit(X[:, subspace_indices])
         cluster_centers = kmeans.cluster_centers_
         cluster_labels = kmeans.labels_
@@ -55,13 +55,27 @@ def heidi_matrix(X, D, k):
         # Compute average quality of clusters weighted by the number of points
         total_points = sum(len(points) for points in cluster_points)
         avg_quality = sum((len(points) / total_points) * quality[0] for quality, points in zip(cluster_quality, cluster_points))
-        subspace_quality[subspace] = 1 / avg_quality  # Inverse of average diameter for quality
+        if avg_quality == 0:
+            subspace_quality[subspace] = 0
+        else:
+            subspace_quality[subspace] = 1 / avg_quality  # Inverse of average diameter for quality
+
+    return subspace_quality
+
+def heidi_matrix_top_subspaces(X, D, k, top_subspaces):
+    n = X.shape[0]
+    subspace_map = {subspace: idx for idx, subspace in enumerate(top_subspaces)}
+    H = np.zeros((n, n, len(top_subspaces)), dtype=int)
+
+    for subspace in top_subspaces:
+        subspace_indices = list(subspace)
+        knn_indices = compute_knn(X, k, subspace_indices)
 
         for i in range(n):
             for j in knn_indices[i]:
                 H[i, j, subspace_map[subspace]] = 1
 
-    return H, P, subspace_quality
+    return H, top_subspaces
 
 def knn_ordering(knn_indices):
     visited = set()
@@ -83,14 +97,9 @@ def knn_ordering(knn_indices):
 def sort_subspaces_by_cluster_quality(subspace_quality):
     return sorted(subspace_quality.items(), key=lambda x: x[1], reverse=True)
 
-def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=10):
+def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, num_subspaces=10):
     n = H.shape[0]
 
-    # Sort the subspaces by their quality
-    sorted_subspaces = sort_subspaces_by_cluster_quality(subspace_quality)
-    top_subspaces = [subspace for subspace, _ in sorted_subspaces[:top_n]]
-
-    # Visualize the top subspaces
     combined_matrix = np.zeros((n, n, 3))  # RGB image
     colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 0), (1, 0, 1), (0, 1, 1), (0.5, 0, 0.5), (0.5, 0.5, 0), (0, 0.5, 0.5)]  # Define unique colors
 
@@ -101,11 +110,12 @@ def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=
     final_order = []
     for label in unique_labels:
         cluster_indices = np.where(cluster_labels_sorted == label)[0]
-        knn_indices = compute_knn(X[sorted_indices[cluster_indices]], k, list(range(X.shape[1])))
-        order = knn_ordering(knn_indices)
+        cluster_center = X[sorted_indices[cluster_indices]].mean(axis=0)
+        distances_to_center = np.linalg.norm(X[sorted_indices[cluster_indices]] - cluster_center, axis=1)
+        order = np.argsort(distances_to_center)
         final_order.extend(cluster_indices[order])
 
-    for i, subspace in enumerate(top_subspaces):
+    for i, subspace in enumerate(P[:num_subspaces]):
         subspace_idx = P.index(subspace)
         H_subspace_reordered = H[:, :, subspace_idx][sorted_indices[final_order]][:, sorted_indices[final_order]]
         for c in range(3):
@@ -115,13 +125,13 @@ def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=
 
     plt.figure(figsize=(15, 10))  # Larger figure size for high resolution
     plt.imshow(combined_matrix, aspect='auto')
-    plt.title(f'Top {top_n} Subspaces Visualization (kNN Ordering within Clusters)')
+    plt.title(f'Top {num_subspaces} Subspaces Visualization (Ordered by Distance to Cluster Center)')
     plt.xlabel('Columns')
     plt.ylabel('Rows')
 
     # Create a legend for the colors
     patches = [plt.plot([], [], marker="s", ms=10, ls="", mec=None, color=colors[i % len(colors)], 
-                label="" + str(top_subspaces[i]))[0] for i in range(top_n)]
+                label="" + str(P[i]))[0] for i in range(num_subspaces)]
     plt.legend(handles=patches, bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0.)
 
     buf = io.BytesIO()
@@ -131,9 +141,23 @@ def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=
 
     return image_data  # Return the image data
 
+def multi_subspace_knn_ordering(H, k):
+    n, _, num_subspaces = H.shape
+    neighbor_counts = np.zeros((n, n), dtype=int)
+
+    for s in range(num_subspaces):
+        neighbor_counts += H[:, :, s]
+
+    # Create a list of points sorted by the number of subspaces they are close in
+    subspace_orders = np.argsort(-neighbor_counts.sum(axis=1))
+
+    return subspace_orders, neighbor_counts
+
 # Example usage
 def main(filepath):
     # Load and preprocess your data
+    num_subspaces = 10
+
     _, file_extension = os.path.splitext(filepath)
         
     if os.path.basename(filepath) == 'Iris.csv':
@@ -153,19 +177,40 @@ def main(filepath):
     scaler = StandardScaler()
     scaled_data = scaler.fit_transform(data)
 
-    kmeans = KMeans(n_clusters=5)
+    kmeans = KMeans(n_clusters=5, random_state=2)
     kmeans.fit(scaled_data)
     cluster_labels = kmeans.labels_
 
     D = range(scaled_data.shape[1])
     k = 6
 
-    H, P, subspace_quality = heidi_matrix(scaled_data, D, k)
+    subspace_quality = calculate_subspace_quality(scaled_data, D, k)
 
-    # Visualize the top 10 subspaces (you can change the number of top subspaces by modifying the top_n parameter)
-    image_data = visualize_top_subspaces(H, P, subspace_quality, cluster_labels, scaled_data, k, top_n=10)
+    # Get the top subspaces by quality
+    sorted_subspaces = sort_subspaces_by_cluster_quality(subspace_quality)
+    top_subspaces = [subspace for subspace, _ in sorted_subspaces[:num_subspaces]]  # Adjust the number of top subspaces as needed
+    # print(top_subspaces)
+
+    # Compute the Heidi matrix for all subspaces first
+    P_all = list(powerset(D))
+    H_all, _ = heidi_matrix_top_subspaces(scaled_data, D, k, P_all)
+
+    # Get the multi-subspace KNN ordering
+    subspace_ordering, neighbor_counts = multi_subspace_knn_ordering(H_all, k)
+    
+    print("Subspace Ordering:", subspace_ordering)
+    
+    # Print points along with the number of subspaces in which they are common
+    for i in subspace_ordering:
+        print(f"Point {i} is common in {neighbor_counts.sum(axis=1)[i]} subspaces")
+
+    # Now compute the Heidi matrix for the top subspaces
+    H, P = heidi_matrix_top_subspaces(scaled_data, D, k, top_subspaces)
+
+    # Visualize the top subspaces
+    image_data = visualize_top_subspaces(H, P, subspace_quality, cluster_labels, scaled_data, k, num_subspaces=num_subspaces)
 
     return {'data': cluster_labels.tolist()}, {'visualization': image_data}
 
 if __name__ == "__main__":
-    main()
+    main()  # Replace with your file path and desired number of subspaces
