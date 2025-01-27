@@ -97,6 +97,26 @@ def knn_ordering(knn_indices):
     return order
 
 
+# def knn_ordering(knn_indices):
+#     visited = set()
+#     order = []
+
+#     def dfs_iterative(start_node):
+#         stack = [start_node]
+#         while stack:
+#             node = stack.pop()
+#             if node not in visited:
+#                 visited.add(node)
+#                 order.append(node)
+#                 # Adding nodes to the stack in reverse order to maintain the order of neighbors
+#                 for neighbor in reversed(knn_indices[node]):
+#                     stack.append(neighbor)
+
+#     for start_node in range(knn_indices.shape[0]):
+#         if start_node not in visited:
+#             dfs_iterative(start_node)
+
+#     return order
 
 def sort_subspaces_by_cluster_quality(subspace_quality):
     return sorted(subspace_quality.items(), key=lambda x: x[1], reverse=True)
@@ -147,6 +167,19 @@ def visualize_top_subspaces(H, P, subspace_quality, cluster_labels, X, k, top_n=
     return image_data  # Return the image data
 
 # Example usage
+import json
+
+def save_image_matrix_as_json(combined_matrix, filepath="image_matrix.json"):
+    # Convert the matrix to a list of lists for JSON serialization
+    matrix_list = combined_matrix.tolist()
+
+    # Save the matrix as a JSON file
+    with open(filepath, 'w') as json_file:
+        json.dump(matrix_list, json_file)
+    
+    print(f"Image matrix saved as {filepath}")
+
+# Example usage
 def main(filepath):
     # Load and preprocess your data
     _, file_extension = os.path.splitext(filepath)
@@ -184,11 +217,39 @@ def main(filepath):
 
     # Compute the Heidi matrix for the top subspaces
     H, P = heidi_matrix_top_subspaces(scaled_data, D, k, top_subspaces)
-    # print(len(top_subspaces))
-    # Visualize the top subspaces
-    image_data = visualize_top_subspaces(H, P, subspace_quality, cluster_labels, scaled_data, k, top_n=10, top_subspaces=top_subspaces)
 
-    return {'data': cluster_labels.tolist()}, {'visualization': image_data}
+    # Visualize the top subspaces
+    combined_matrix = np.zeros((H.shape[0], H.shape[1], 3))  # RGB image
+
+    colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1), (1, 1, 0), (1, 0, 1), (0, 1, 1), (0.5, 0, 0.5), (0.5, 0.5, 0), (0, 0.5, 0.5)]  # Define unique colors
+
+    sorted_indices = np.argsort(cluster_labels)
+    cluster_labels_sorted = cluster_labels[sorted_indices]
+    unique_labels = np.unique(cluster_labels_sorted)
+
+    final_order = []
+    for label in unique_labels:
+        cluster_indices = np.where(cluster_labels_sorted == label)[0]
+        knn_indices = compute_knn(scaled_data[sorted_indices[cluster_indices]], k, list(range(scaled_data.shape[1])))
+        order = knn_ordering(knn_indices)
+        final_order.extend(cluster_indices[order])
+
+    for i, subspace in enumerate(top_subspaces):
+        subspace_idx = P.index(subspace)
+        H_subspace_reordered = H[:, :, subspace_idx][sorted_indices[final_order]][:, sorted_indices[final_order]]
+        for c in range(3):
+            combined_matrix[:, :, c] += H_subspace_reordered * colors[i % len(colors)][c]
+
+    combined_matrix = np.clip(combined_matrix, 0, 1)  # Ensure values are between 0 and 1
+
+    # Save the image matrix as a JSON file
+    save_image_matrix_as_json(combined_matrix)
+
+    return {'data': cluster_labels.tolist()}
+
+if __name__ == "__main__":
+    main('Iris.csv')
+
 
 if __name__ == "__main__":
     main()

@@ -234,15 +234,17 @@ def main(filepath):
     H_list = []
     image_data_list = []
     # Visualize each single-dimensional Heidi matrix and store in the list
-    for dim in D:
-        H_single = heidi_matrix_single_dimension(scaled_data, dim, k)
-        H_list.append(H_single)
-        image_data=visualize_heidi_matrix_single(H_single, cluster_labels, scaled_data, dim, k)
-        image_data_list.append(image_data)
-        # print(len(image_data_list))
+    # for dim in D:
+    #     H_single = heidi_matrix_single_dimension(scaled_data, dim, k)
+    #     H_list.append(H_single)
+    #     image_data=visualize_heidi_matrix_single(H_single, cluster_labels, scaled_data, dim, k)
+    #     image_data_list.append(image_data)
+    #     # print(len(image_data_list))
 
-    # print(len(image_data_list))
-    return {"data": cluster_labels.tolist()}, image_data_list
+    # # print(len(image_data_list))
+    # return {"data": cluster_labels.tolist()}, image_data_list
 
     # Visualize the combined Heidi matrix
-    # visualize_combined_heidi_matrix(H_list, cluster_labels, scaled_data, k)
+    image_data= visualize_combined_heidi_matrix(H_list, cluster_labels, scaled_data, k)
+
+    return {"data": cluster_labels.tolist()}, {"visualization": image_data}

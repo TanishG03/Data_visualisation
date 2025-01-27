@@ -4,11 +4,12 @@ import base64
 from final_top import main  # Import the main function from your Python script
 import final_top as script_1
 import final_spiral as script_2
-import knn_ordering as script_3
+import knn as script_3
 import limit_knn as script_4
 import new_ordering as script_5
 import individual as script_6
 import new as script_7
+import largest as script_8
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -49,6 +50,8 @@ def upload_file():
         output_data, image_data_list = script_6.main(file_path)
     elif option == '7':
         output_data, images = script_7.main(file_path)
+    elif option == '8':
+        output_data, images = script_8.main(file_path)
     else:
         return jsonify({'error': 'Invalid option'})
 

@@ -47,6 +47,7 @@ const UploadCSV = () => {
         <option value="5">new</option>
         <option value="6">Individual</option>
         <option value="7">Other</option>
+        <option value="8">Largest</option>
       </select>
       <button onClick={handleUpload}>Upload</button>
 
